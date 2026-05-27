@@ -1,0 +1,195 @@
+PROMPTS USED — Ekantipur.com Scraper
+Audio Bee Technical Assessment
+
+PROMPT 1 — Create project skeleton
+
+Create a Python file called scraper.py using Playwright sync API.
+
+Include:
+- make_absolute_url(url) helper that prepends "https://ekantipur.com" 
+  if the URL does not start with "http"
+- extract_entertainment_news(page) function — empty body, returns []
+- extract_cartoon_of_the_day(page) function — empty body, returns {}
+- main() function that launches Chromium with headless=False,
+  sets viewport to 1280x800, calls both functions, saves result
+  to output.json using ensure_ascii=False and indent=2
+- if __name__ == "__main__": guard at the bottom
+
+
+PROMPT 2 — Navigate to entertainment page and get cards
+
+In the extract_entertainment_news(page) function in scraper.py:
+
+Add code to:
+1. Navigate to https://ekantipur.com/entertainment 
+   with wait_until="domcontentloaded"
+2. Wait 4 seconds for JS to render
+3. Scroll down 500px four times with 600ms wait between each scroll
+4. Wait for selector ".category" with timeout of 10 seconds
+5. Get all elements matching ".category" using query_selector_all
+6. Print how many cards were found
+
+
+PROMPT 3 — Extract title and skip duplicates
+
+Inside the card loop in extract_entertainment_news(page):
+
+Add code to extract the title from each .category card:
+- Selector: h2 a (fallback to h3 a if h2 a not found)
+- Use text_content().strip() to get the text
+- Skip the card if title is None or empty
+- Use a seen_titles set to skip duplicate titles and print a message
+- Stop the loop once 5 unique articles are collected
+- Wrap in try/except returning None on failure
+
+
+PROMPT 4 — Extract image URL from each card
+
+Inside the card loop in extract_entertainment_news(page),
+after title extraction:
+
+Add image extraction:
+- First try selector: .category-image img
+- If not found, fallback to any img inside the card
+- Get the src attribute
+- If src is None, empty, starts with "data:", or shorter than 
+  10 characters, get data-src attribute instead
+- Pass the result through make_absolute_url()
+- Store as article["image_url"]
+- Wrap in try/except returning None on failure
+
+
+PROMPT 5 — Extract category from article URL
+
+Inside the card loop in extract_entertainment_news(page),
+after image extraction:
+
+Add category detection from the article href:
+- Get the href from the title link (h2 a or h3 a)
+- Check these conditions in order:
+    "bollywood" in href → category = "बलिउड"
+    "song" or "music" in href → category = "संगीत"
+    "film" or "movie" or "cinema" in href → category = "चलचित्र"
+    "television" or "serial" in href → category = "टेलिभिजन"
+    anything else → category = "मनोरञ्जन"
+- Store as article["category"]
+- Wrap in try/except defaulting to "मनोरञ्जन"
+
+Note: The site does not put category labels inside article cards.
+The read time like "8 MINS READ" appears in the HTML but is NOT 
+the category — do not use it.
+
+
+PROMPT 6 — Extract author from each card
+
+Inside the card loop in extract_entertainment_news(page),
+after category extraction:
+
+Add author extraction:
+- First try selector: .author-name a
+- Fallback to: .author-name
+- Use text_content().strip()
+- If neither found, return None
+- Store as article["author"]
+- Wrap in try/except returning None on failure
+
+Then append the complete article dict to the articles list and 
+print the article number, title (first 50 chars), category, author.
+Return articles at the end of the function.
+
+
+PROMPT 7 — Navigate to cartoon page and find the card
+
+In the extract_cartoon_of_the_day(page) function in scraper.py:
+
+Add code to:
+1. Navigate to https://ekantipur.com/cartoon 
+   with wait_until="domcontentloaded"
+2. Wait 4 seconds
+3. Scroll 400px and wait 1.5 seconds
+4. Wait for selector ".cartoon-wrapper" with timeout of 10 seconds
+5. Get the first element matching ".cartoon-wrapper" 
+   using query_selector (not query_selector_all)
+6. If not found, print an error and return the empty cartoon dict
+7. Wrap the goto in try/except and return empty dict on failure
+
+
+PROMPT 8 — Extract cartoon image and title
+
+Inside extract_cartoon_of_the_day(page), after finding the card:
+
+Add extraction for image and title:
+
+Image:
+- Selector: .cartoon-image img
+- Get the src attribute
+- If src is None or shorter than 10 chars, get data-src instead
+- Pass through make_absolute_url()
+- Store as cartoon["image_url"]
+
+Title:
+- Same img element
+- Get the alt attribute using get_attribute("alt")
+- Strip whitespace
+- Store as cartoon["title"]
+
+Wrap each in separate try/except blocks returning None on failure.
+
+
+PROMPT 9 — Extract cartoon author
+
+Inside extract_cartoon_of_the_day(page), after image and title:
+
+Add author extraction:
+- Selector: .cartoon-description p (first p tag inside description)
+- The text format is: "TITLE! - AUTHOR NAME"
+  example: "गजब छ बा! - नाम प्रसाद"
+- Split the text by " - " and take index 1 (the part after the dash)
+- Strip whitespace from the result
+- If the result is empty string, store None
+- Store as cartoon["author"]
+- Wrap in try/except returning None on failure
+
+Then print the cartoon title, image URL (first 80 chars), and author.
+Return the cartoon dict.
+
+
+PROMPT 10 — Add output validation function
+
+Add a validate_output(data) function to scraper.py that:
+
+Checks entertainment_news:
+- List has exactly 5 items → print PASS or FAIL
+- For each article:
+    title exists and is not empty → PASS or FAIL
+    title not already seen (no duplicates) → PASS or FAIL
+    image_url starts with "http" → PASS or FAIL
+    category is not empty and does not contain "READ" or "MIN" → PASS or FAIL
+    author can be None → always acceptable, print the value
+
+Checks cartoon_of_the_day:
+- title exists and is not the string "कार्टुन" → PASS or FAIL
+- image_url starts with "http" → PASS or FAIL
+- author can be None → print as acceptable
+
+Print final line:
+  ALL CHECKS PASSED — Ready to submit!
+  or SOME CHECKS FAILED
+
+Call validate_output(output) inside main() before saving the JSON file.
+
+
+SELECTORS FOUND MANUALLY VIA DEVTOOLS
+
+Entertainment page — https://ekantipur.com/entertainment
+  .category             → each article card (31 found)
+  h2 a                  → article title inside card
+  .category-image img   → thumbnail image (src or data-src)
+  .author-name a        → author name inside card
+  category label        → NOT in HTML, detected from article URL
+
+Cartoon page — https://ekantipur.com/cartoon
+  .cartoon-wrapper      → each cartoon card
+  .cartoon-image img    → cartoon image (src attribute)
+  img alt attribute     → cartoon title
+  .cartoon-description p → text format: "TITLE! - AUTHOR"
